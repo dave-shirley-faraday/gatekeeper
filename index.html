@@ -286,6 +286,73 @@
     background: var(--border);
     color: var(--text);
   }
+
+  /* Contenteditable input */
+  #transcript {
+    width: 100%;
+    min-height: 100px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 12px 14px;
+    outline: none;
+    transition: border-color 0.2s;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  #transcript:focus {
+    border-color: var(--accent);
+  }
+
+  #transcript:empty:before {
+    content: attr(data-placeholder);
+    color: var(--text-dim);
+    opacity: 0.6;
+    pointer-events: none;
+  }
+
+  #transcript .input-token {
+    cursor: pointer;
+    border-radius: 3px;
+    transition: background 0.15s;
+  }
+
+  #transcript .input-token:hover {
+    background: var(--accent-dim);
+  }
+
+  #transcript .input-token.highlight {
+    background: var(--accent);
+    color: var(--bg);
+  }
+
+  #transcript .delim {
+    color: var(--text-dim);
+  }
+
+  /* Clickable parsed tokens */
+  .parsed-output .clickable {
+    cursor: pointer;
+    border-radius: 3px;
+    padding: 1px 3px;
+    margin: -1px -3px;
+    transition: background 0.15s;
+  }
+
+  .parsed-output .clickable:hover {
+    background: var(--surface2);
+  }
+
+  .parsed-output .clickable.highlight {
+    background: var(--accent);
+    color: var(--bg) !important;
+  }
 </style>
 </head>
 <body>
@@ -297,7 +364,7 @@
 
   <div class="input-section">
     <label>Transcript</label>
-    <textarea id="transcript" placeholder="Tap mic and dictate: start, red, blue, red, crest, blue, double red, blue undergate, red, finish" spellcheck="false" autocapitalize="none" autocorrect="off"></textarea>
+    <div id="transcript" contenteditable="true" data-placeholder="Tap mic and dictate: start, red, blue, red, crest, blue, double red, blue undergate, red, finish" spellcheck="false" autocapitalize="none" autocorrect="off"></div>
   </div>
 
   <div class="samples">
@@ -340,19 +407,65 @@ const SAMPLES = {
 };
 
 function loadSample(key) {
-  document.getElementById('transcript').value = SAMPLES[key];
+  const el = document.getElementById('transcript');
+  el.textContent = SAMPLES[key];
   generate();
 }
+
+// ── Paste handler (strip formatting) ──
+
+document.addEventListener('DOMContentLoaded', () => {
+  const transcript = document.getElementById('transcript');
+
+  transcript.addEventListener('paste', (e) => {
+    e.preventDefault();
+    const text = e.clipboardData.getData('text/plain');
+    document.execCommand('insertText', false, text);
+  });
+
+  // Clear highlighting when user starts editing
+  transcript.addEventListener('beforeinput', () => {
+    // If it contains styled spans, user is about to edit - reset to plain text first
+    if (transcript.querySelector('.input-token')) {
+      // Save cursor position as text offset
+      const sel = window.getSelection();
+      let cursorOffset = 0;
+
+      if (sel.rangeCount > 0) {
+        const range = sel.getRangeAt(0);
+        const preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(transcript);
+        preCaretRange.setEnd(range.startContainer, range.startOffset);
+        cursorOffset = preCaretRange.toString().length;
+      }
+
+      // Reset to plain text
+      const text = transcript.textContent;
+      transcript.textContent = text;
+
+      // Restore cursor position
+      const textNode = transcript.firstChild;
+      if (textNode && cursorOffset >= 0 && text.length > 0) {
+        const range = document.createRange();
+        range.setStart(textNode, Math.min(cursorOffset, textNode.length));
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    }
+  });
+});
 
 function toggleHelp() {
   document.getElementById('helpPanel').classList.toggle('open');
 }
 
 function clearAll() {
-  document.getElementById('transcript').value = '';
+  document.getElementById('transcript').textContent = '';
   document.getElementById('parsedSection').innerHTML = '';
   document.getElementById('diagramSection').innerHTML = '';
   document.getElementById('errorBox').innerHTML = '';
+  currentHighlight = null;
 }
 
 // ── Parser ──
@@ -403,12 +516,12 @@ const CONTROL_TOKENS = new Set(['start', 'finish', 'flip', 'flag']);
 
 function parseTranscript(raw) {
   const tokens = tokenize(raw);
-  if (tokens.length === 0) return { gates: [], errors: ['Empty transcript'] };
+  if (tokens.length === 0) return { gates: [], tokens: [], errors: ['Empty transcript'] };
 
   const gates = [];
   let direction = -1; // -1 = left, +1 = right
   let gateNum = 0;
-  let annotationBuffer = [];
+  let annotationBuffer = []; // {text, tokenIdx}
   const errors = [];
 
   // Detect first color
@@ -420,16 +533,18 @@ function parseTranscript(raw) {
   const colors = [firstColor, firstColor === 'red' ? 'blue' : 'red'];
   let colorIdx = 0;
 
-  for (const token of tokens) {
+  for (let i = 0; i < tokens.length; i++) {
+    const token = tokens[i];
+
     if (token === 'start') {
-      gates.push({ type: 'start', color: null, direction: 0, gateNum: null, annotations: [], flagged: false });
+      gates.push({ type: 'start', color: null, direction: 0, gateNum: null, annotations: [], tokenIdx: i, flagged: false });
     } else if (token === 'finish') {
-      gates.push({ type: 'finish', color: null, direction: 0, gateNum: null, annotations: [], flagged: false });
+      gates.push({ type: 'finish', color: null, direction: 0, gateNum: null, annotations: [], tokenIdx: i, flagged: false });
     } else if (token === 'red' || token === 'blue') {
       gateNum++;
       gates.push({
         type: 'regular', color: token, direction, gateNum,
-        annotations: [...annotationBuffer], flagged: false
+        annotations: [...annotationBuffer], tokenIdx: i, flagged: false
       });
       annotationBuffer = [];
       direction *= -1;
@@ -439,7 +554,7 @@ function parseTranscript(raw) {
       const color = token.includes('red') ? 'red' : 'blue';
       gates.push({
         type: 'double', color, direction: 0, gateNum,
-        annotations: [...annotationBuffer], flagged: false
+        annotations: [...annotationBuffer], tokenIdx: i, flagged: false
       });
       annotationBuffer = [];
       direction *= -1;
@@ -449,23 +564,26 @@ function parseTranscript(raw) {
       const color = token.includes('red') ? 'red' : 'blue';
       gates.push({
         type: 'undergate', color, direction: 0, gateNum,
-        annotations: [...annotationBuffer], flagged: false
+        annotations: [...annotationBuffer], tokenIdx: i, flagged: false
       });
       annotationBuffer = [];
       // Flip color only, NOT direction
       colorIdx = 1 - colorIdx;
     } else if (token === 'flip') {
+      // flip is a control token, not rendered but track it
+      gates.push({ type: 'flip', tokenIdx: i });
       direction *= -1;
     } else if (token === 'flag') {
       // Attach to previous gate
       if (gates.length > 0) gates[gates.length - 1].flagged = true;
+      gates[gates.length - 1].flagTokenIdx = i;
     } else {
       // Annotation — buffer for next gate
-      annotationBuffer.push(token);
+      annotationBuffer.push({ text: token, tokenIdx: i });
     }
   }
 
-  return { gates, errors };
+  return { gates, tokens, errors };
 }
 
 // ── Formatted Transcript ──
@@ -473,14 +591,16 @@ function parseTranscript(raw) {
 function renderParsed(gates) {
   let parts = [];
   for (const g of gates) {
+    if (g.type === 'flip') continue; // skip flip markers
+
     if (g.type === 'start') {
-      parts.push('<span class="tok-meta">START</span>');
+      parts.push(`<span class="tok-meta clickable" data-token-idx="${g.tokenIdx}" onclick="onParsedClick(${g.tokenIdx})">START</span>`);
     } else if (g.type === 'finish') {
-      parts.push('<span class="tok-meta">FINISH</span>');
+      parts.push(`<span class="tok-meta clickable" data-token-idx="${g.tokenIdx}" onclick="onParsedClick(${g.tokenIdx})">FINISH</span>`);
     } else {
       // Annotations before gate
       for (const a of g.annotations) {
-        parts.push(`<span class="tok-annotation">${esc(a)}</span>`);
+        parts.push(`<span class="tok-annotation clickable" data-token-idx="${a.tokenIdx}" onclick="onParsedClick(${a.tokenIdx})">${esc(a.text)}</span>`);
       }
 
       let label = '';
@@ -495,17 +615,75 @@ function renderParsed(gates) {
       }
 
       const num = `<span class="tok-num">${g.gateNum}.</span> `;
-      parts.push(num + `<span class="${cls}">${esc(label)}</span>`);
+      parts.push(num + `<span class="${cls} clickable" data-token-idx="${g.tokenIdx}" onclick="onParsedClick(${g.tokenIdx})">${esc(label)}</span>`);
 
-      if (g.flagged) parts.push('<span class="tok-flag">⚑ flag</span>');
+      if (g.flagged) {
+        const flagIdx = g.flagTokenIdx !== undefined ? g.flagTokenIdx : g.tokenIdx;
+        parts.push(`<span class="tok-flag clickable" data-token-idx="${flagIdx}" onclick="onParsedClick(${flagIdx})">⚑ flag</span>`);
+      }
     }
   }
   return parts.join('\n');
 }
 
+function onParsedClick(idx) {
+  const tokenIdx = String(idx);
+  if (currentHighlight === tokenIdx) {
+    clearHighlight();
+  } else {
+    highlightToken(tokenIdx);
+    const other = document.querySelector(`#transcript [data-token-idx="${tokenIdx}"]`);
+    if (other) other.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
 function esc(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
+
+// ── Render input with clickable tokens ──
+
+function renderInputWithTokens(tokens) {
+  return tokens.map((t, i) =>
+    `<span class="input-token" data-token-idx="${i}" onclick="onTokenClick(${i}, this)">${esc(t)}</span>`
+  ).join('<span class="delim">, </span>');
+}
+
+function onTokenClick(idx, el) {
+  const tokenIdx = String(idx);
+  if (currentHighlight === tokenIdx) {
+    clearHighlight();
+  } else {
+    highlightToken(tokenIdx);
+    const other = document.querySelector(`.parsed-output [data-token-idx="${tokenIdx}"]`);
+    if (other) other.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+// ── Click highlighting ──
+
+let currentHighlight = null;
+
+function clearHighlight() {
+  if (currentHighlight !== null) {
+    document.querySelectorAll(`[data-token-idx="${currentHighlight}"]`).forEach(el => {
+      el.classList.remove('highlight');
+    });
+    currentHighlight = null;
+  }
+}
+
+function highlightToken(tokenIdx) {
+  // Clear previous
+  clearHighlight();
+
+  // Set new highlight
+  currentHighlight = tokenIdx;
+  document.querySelectorAll(`[data-token-idx="${tokenIdx}"]`).forEach(el => {
+    el.classList.add('highlight');
+  });
+}
+
 
 // ── SVG Diagram ──
 
@@ -520,11 +698,14 @@ function generateSVG(gates) {
   const topPad = 30;
   const botPad = 30;
 
+  // Filter out flip gates (they affect direction but don't render)
+  const renderableGates = gates.filter(g => g.type !== 'flip');
+
   // Compute Y positions and X positions
   let y = topPad;
   const positioned = [];
 
-  for (const g of gates) {
+  for (const g of renderableGates) {
     const entry = { ...g, y, x: centerX };
 
     if (g.type === 'start' || g.type === 'finish') {
@@ -635,7 +816,7 @@ function generateSVG(gates) {
       for (let ai = 0; ai < g.annotations.length; ai++) {
         const annY = g.y + 4 + ai * 14;
         const annX = width - 14;
-        svg += `<text x="${annX}" y="${annY}" text-anchor="end" fill="#f4a261" font-family="'DM Sans',sans-serif" font-size="10" font-style="italic" opacity="0.8">⛰ ${escSvg(g.annotations[ai])}</text>`;
+        svg += `<text x="${annX}" y="${annY}" text-anchor="end" fill="#f4a261" font-family="'DM Sans',sans-serif" font-size="10" font-style="italic" opacity="0.8">⛰ ${escSvg(g.annotations[ai].text)}</text>`;
       }
     }
 
@@ -657,7 +838,8 @@ function escSvg(s) {
 // ── Main ──
 
 function generate() {
-  const raw = document.getElementById('transcript').value.trim();
+  const transcriptEl = document.getElementById('transcript');
+  const raw = transcriptEl.textContent.trim();
   const errorBox = document.getElementById('errorBox');
   const parsedSection = document.getElementById('parsedSection');
   const diagramSection = document.getElementById('diagramSection');
@@ -665,18 +847,22 @@ function generate() {
   errorBox.innerHTML = '';
   parsedSection.innerHTML = '';
   diagramSection.innerHTML = '';
+  currentHighlight = null;
 
   if (!raw) {
     errorBox.innerHTML = '<div class="error-msg">Enter a transcript above — tap the mic icon on your keyboard to dictate.</div>';
     return;
   }
 
-  const { gates, errors } = parseTranscript(raw);
+  const { gates, tokens, errors } = parseTranscript(raw);
 
-  if (gates.length === 0) {
+  if (gates.length === 0 || gates.every(g => g.type === 'flip')) {
     errorBox.innerHTML = '<div class="error-msg">No gates found. Try: start, red, blue, red, blue, finish</div>';
     return;
   }
+
+  // Re-render input with clickable tokens
+  transcriptEl.innerHTML = renderInputWithTokens(tokens);
 
   // Show parsed output
   parsedSection.innerHTML = `
@@ -694,13 +880,6 @@ function generate() {
     </div>`;
 }
 
-// Auto-generate on Enter in textarea (but not on mobile where Enter adds newline)
-document.getElementById('transcript').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
-    e.preventDefault();
-    generate();
-  }
-});
 </script>
 </body>
 </html>
