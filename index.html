@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Gatekeeper">
+<title>Gatekeeper — Slalom Course Diagram</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0f1114;
+    --surface: #1a1d22;
+    --surface2: #22262d;
+    --border: #2e3340;
+    --text: #e4e6eb;
+    --text-dim: #8b8f9a;
+    --red-gate: #e63946;
+    --red-glow: rgba(230, 57, 70, 0.25);
+    --blue-gate: #3a86ff;
+    --blue-glow: rgba(58, 134, 255, 0.25);
+    --accent: #f4a261;
+    --accent-dim: rgba(244, 162, 97, 0.15);
+    --green: #2ec4b6;
+    --passage: rgba(255,255,255,0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'DM Sans', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .app {
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 0 16px 80px;
+  }
+
+  header {
+    padding: 24px 0 16px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  header h1 {
+    font-family: 'DM Mono', monospace;
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    color: var(--text);
+  }
+
+  header span {
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.3px;
+  }
+
+  .input-section {
+    margin-bottom: 16px;
+  }
+
+  .input-section label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  textarea {
+    width: 100%;
+    min-height: 100px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 12px 14px;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  textarea:focus {
+    border-color: var(--accent);
+  }
+
+  textarea::placeholder {
+    color: var(--text-dim);
+    opacity: 0.6;
+  }
+
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+  }
+
+  button {
+    font-family: 'DM Sans', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    border: none;
+    border-radius: 8px;
+    padding: 10px 20px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: var(--bg);
+    flex: 1;
+  }
+
+  .btn-primary:active {
+    transform: scale(0.97);
+    opacity: 0.9;
+  }
+
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text-dim);
+    padding: 10px 14px;
+  }
+
+  .btn-secondary:active {
+    background: var(--border);
+  }
+
+  .help-toggle {
+    font-size: 12px;
+    color: var(--text-dim);
+    background: none;
+    border: none;
+    padding: 4px 0;
+    cursor: pointer;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    font-family: 'DM Sans', sans-serif;
+    margin-bottom: 12px;
+    display: inline-block;
+  }
+
+  .help-panel {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 16px;
+    font-size: 13px;
+    line-height: 1.6;
+    color: var(--text-dim);
+  }
+
+  .help-panel.open { display: block; }
+
+  .help-panel h3 {
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .help-panel code {
+    font-family: 'DM Mono', monospace;
+    font-size: 12px;
+    background: var(--surface2);
+    padding: 1px 5px;
+    border-radius: 3px;
+    color: var(--accent);
+  }
+
+  .help-panel p { margin-bottom: 8px; }
+  .help-panel p:last-child { margin-bottom: 0; }
+
+  /* Parsed output */
+  .parsed-section {
+    margin-bottom: 16px;
+  }
+
+  .parsed-section label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .parsed-output {
+    font-family: 'DM Mono', monospace;
+    font-size: 13px;
+    line-height: 1.6;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: var(--text);
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .parsed-output .tok-red { color: var(--red-gate); font-weight: 500; }
+  .parsed-output .tok-blue { color: var(--blue-gate); font-weight: 500; }
+  .parsed-output .tok-annotation { color: var(--accent); font-style: italic; }
+  .parsed-output .tok-meta { color: var(--green); }
+  .parsed-output .tok-flag { color: #facc15; }
+  .parsed-output .tok-num { color: var(--text-dim); font-size: 11px; }
+
+  /* Diagram */
+  .diagram-section {
+    margin-top: 8px;
+  }
+
+  .diagram-section label {
+    display: block;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+  }
+
+  .diagram-container {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px;
+    overflow-x: auto;
+  }
+
+  .diagram-container svg {
+    display: block;
+    margin: 0 auto;
+  }
+
+  .error-msg {
+    background: rgba(230, 57, 70, 0.1);
+    border: 1px solid rgba(230, 57, 70, 0.3);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 13px;
+    color: var(--red-gate);
+    margin-bottom: 12px;
+  }
+
+  /* Sample buttons */
+  .samples {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .sample-btn {
+    font-size: 11px;
+    font-family: 'DM Mono', monospace;
+    background: var(--surface2);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 5px 10px;
+    cursor: pointer;
+  }
+
+  .sample-btn:active {
+    background: var(--border);
+    color: var(--text);
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>⛷ Gatekeeper</h1>
+    <span>slalom course diagram</span>
+  </header>
+
+  <div class="input-section">
+    <label>Transcript</label>
+    <textarea id="transcript" placeholder="Tap mic and dictate: start, red, blue, red, crest, blue, double red, blue undergate, red, finish" spellcheck="false" autocapitalize="none" autocorrect="off"></textarea>
+  </div>
+
+  <div class="samples">
+    <button class="sample-btn" onclick="loadSample('short')">Short sample</button>
+    <button class="sample-btn" onclick="loadSample('full')">Full sample</button>
+  </div>
+
+  <div class="actions">
+    <button class="btn-primary" onclick="generate()">Generate Diagram</button>
+    <button class="btn-secondary" onclick="clearAll()">Clear</button>
+  </div>
+
+  <button class="help-toggle" onclick="toggleHelp()">Voice grammar reference ▾</button>
+  <div class="help-panel" id="helpPanel">
+    <h3>Gate calls</h3>
+    <p><code>red</code> / <code>blue</code> — regular gate<br>
+    <code>double red</code> / <code>double blue</code> — vertical combo<br>
+    <code>red undergate</code> / <code>blue undergate</code> — undergate</p>
+    <h3>Control</h3>
+    <p><code>start</code> / <code>finish</code> — passage gates<br>
+    <code>flip</code> — reverse direction (no gate)<br>
+    <code>flag</code> — bookmark for review</p>
+    <h3>Annotations</h3>
+    <p>Any other word attaches to the next gate as a terrain note: <code>crest</code>, <code>blind</code>, <code>steep</code>, <code>dip</code>, <code>flat</code>, etc.</p>
+    <h3>Tips</h3>
+    <p>Separate with commas, periods, or newlines. Dictation usually gives you commas naturally. Color names don't need to match alternation — the parser uses whatever you say.</p>
+  </div>
+
+  <div id="errorBox"></div>
+  <div id="parsedSection"></div>
+  <div id="diagramSection"></div>
+</div>
+
+<script>
+// ── Samples ──
+
+const SAMPLES = {
+  short: "start, red, blue, red, blue, red, blue, finish",
+  full: "start, blue, red, blue, crest, red, blue, red, double blue, red, blue undergate, red, steep, blue, flag, red, blue, red, blue, dip, red, blue, finish"
+};
+
+function loadSample(key) {
+  document.getElementById('transcript').value = SAMPLES[key];
+  generate();
+}
+
+function toggleHelp() {
+  document.getElementById('helpPanel').classList.toggle('open');
+}
+
+function clearAll() {
+  document.getElementById('transcript').value = '';
+  document.getElementById('parsedSection').innerHTML = '';
+  document.getElementById('diagramSection').innerHTML = '';
+  document.getElementById('errorBox').innerHTML = '';
+}
+
+// ── Parser ──
+// Forgiving: handles commas, periods, newlines, extra spaces.
+// Normalizes dictation quirks.
+
+function tokenize(raw) {
+  // Replace common dictation artifacts
+  let s = raw.toLowerCase()
+    .replace(/\band\b/g, ',')          // "red and blue" → "red , blue"
+    .replace(/\bthen\b/g, ',')
+    .replace(/\bnext\b/g, ',')
+    .replace(/under\s*gate/g, 'undergate')
+    .replace(/\n/g, ',')
+    .replace(/\./g, ',')
+    .replace(/;/g, ',');
+
+  // Split on commas, trim, filter empties
+  let tokens = s.split(',').map(t => t.trim()).filter(t => t.length > 0);
+
+  // Merge "double red" / "double blue" / "red undergate" / "blue undergate"
+  let merged = [];
+  for (let i = 0; i < tokens.length; i++) {
+    let t = tokens[i];
+    // Handle multi-word tokens within a single comma-segment
+    let words = t.split(/\s+/);
+    let j = 0;
+    while (j < words.length) {
+      let w = words[j];
+      if (w === 'double' && j + 1 < words.length && (words[j+1] === 'red' || words[j+1] === 'blue')) {
+        merged.push('double ' + words[j+1]);
+        j += 2;
+      } else if ((w === 'red' || w === 'blue') && j + 1 < words.length && words[j+1] === 'undergate') {
+        merged.push(w + ' undergate');
+        j += 2;
+      } else {
+        merged.push(w);
+        j++;
+      }
+    }
+  }
+
+  return merged;
+}
+
+const GATE_TOKENS = new Set(['red', 'blue', 'double red', 'double blue', 'red undergate', 'blue undergate']);
+const CONTROL_TOKENS = new Set(['start', 'finish', 'flip', 'flag']);
+
+function parseTranscript(raw) {
+  const tokens = tokenize(raw);
+  if (tokens.length === 0) return { gates: [], errors: ['Empty transcript'] };
+
+  const gates = [];
+  let direction = -1; // -1 = left, +1 = right
+  let gateNum = 0;
+  let annotationBuffer = [];
+  const errors = [];
+
+  // Detect first color
+  let firstColor = 'red';
+  for (const t of tokens) {
+    if (t.includes('red')) { firstColor = 'red'; break; }
+    if (t.includes('blue')) { firstColor = 'blue'; break; }
+  }
+  const colors = [firstColor, firstColor === 'red' ? 'blue' : 'red'];
+  let colorIdx = 0;
+
+  for (const token of tokens) {
+    if (token === 'start') {
+      gates.push({ type: 'start', color: null, direction: 0, gateNum: null, annotations: [], flagged: false });
+    } else if (token === 'finish') {
+      gates.push({ type: 'finish', color: null, direction: 0, gateNum: null, annotations: [], flagged: false });
+    } else if (token === 'red' || token === 'blue') {
+      gateNum++;
+      gates.push({
+        type: 'regular', color: token, direction, gateNum,
+        annotations: [...annotationBuffer], flagged: false
+      });
+      annotationBuffer = [];
+      direction *= -1;
+      colorIdx = 1 - colorIdx;
+    } else if (token === 'double red' || token === 'double blue') {
+      gateNum++;
+      const color = token.includes('red') ? 'red' : 'blue';
+      gates.push({
+        type: 'double', color, direction: 0, gateNum,
+        annotations: [...annotationBuffer], flagged: false
+      });
+      annotationBuffer = [];
+      direction *= -1;
+      colorIdx = 1 - colorIdx;
+    } else if (token === 'red undergate' || token === 'blue undergate') {
+      gateNum++;
+      const color = token.includes('red') ? 'red' : 'blue';
+      gates.push({
+        type: 'undergate', color, direction: 0, gateNum,
+        annotations: [...annotationBuffer], flagged: false
+      });
+      annotationBuffer = [];
+      // Flip color only, NOT direction
+      colorIdx = 1 - colorIdx;
+    } else if (token === 'flip') {
+      direction *= -1;
+    } else if (token === 'flag') {
+      // Attach to previous gate
+      if (gates.length > 0) gates[gates.length - 1].flagged = true;
+    } else {
+      // Annotation — buffer for next gate
+      annotationBuffer.push(token);
+    }
+  }
+
+  return { gates, errors };
+}
+
+// ── Formatted Transcript ──
+
+function renderParsed(gates) {
+  let parts = [];
+  for (const g of gates) {
+    if (g.type === 'start') {
+      parts.push('<span class="tok-meta">START</span>');
+    } else if (g.type === 'finish') {
+      parts.push('<span class="tok-meta">FINISH</span>');
+    } else {
+      // Annotations before gate
+      for (const a of g.annotations) {
+        parts.push(`<span class="tok-annotation">${esc(a)}</span>`);
+      }
+
+      let label = '';
+      const cls = g.color === 'red' ? 'tok-red' : 'tok-blue';
+
+      if (g.type === 'regular') {
+        label = g.color;
+      } else if (g.type === 'double') {
+        label = `double ${g.color}`;
+      } else if (g.type === 'undergate') {
+        label = `${g.color} undergate`;
+      }
+
+      const num = `<span class="tok-num">${g.gateNum}.</span> `;
+      parts.push(num + `<span class="${cls}">${esc(label)}</span>`);
+
+      if (g.flagged) parts.push('<span class="tok-flag">⚑ flag</span>');
+    }
+  }
+  return parts.join('\n');
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── SVG Diagram ──
+
+function generateSVG(gates) {
+  const width = 300;
+  const gateSpacing = 52;
+  const centerX = width / 2;
+  const offset = 70;        // lateral offset for regular gates
+  const gateR = 10;         // gate circle radius
+  const poleR = 5;          // undergate pole radius
+  const comboGap = 22;      // vertical gap between combo poles
+  const topPad = 30;
+  const botPad = 30;
+
+  // Compute Y positions and X positions
+  let y = topPad;
+  const positioned = [];
+
+  for (const g of gates) {
+    const entry = { ...g, y, x: centerX };
+
+    if (g.type === 'start' || g.type === 'finish') {
+      entry.x = centerX;
+    } else if (g.type === 'regular') {
+      entry.x = centerX + g.direction * offset;
+    } else if (g.type === 'double') {
+      entry.x = centerX;
+      entry.y2 = y + comboGap;
+    } else if (g.type === 'undergate') {
+      entry.x = centerX;
+    }
+
+    positioned.push(entry);
+    y += gateSpacing;
+    if (g.type === 'double') y += comboGap; // extra space for second pole
+  }
+
+  const height = y + botPad;
+
+  // Build passage line points (for bezier curve)
+  const passPoints = [];
+  for (const g of positioned) {
+    if (g.type === 'start' || g.type === 'finish') {
+      passPoints.push({ x: centerX, y: g.y });
+    } else if (g.type === 'regular') {
+      // Swing wider than the gate position
+      passPoints.push({ x: centerX + g.direction * (offset + 18), y: g.y });
+    } else if (g.type === 'double') {
+      passPoints.push({ x: centerX, y: g.y + comboGap / 2 });
+    } else if (g.type === 'undergate') {
+      passPoints.push({ x: centerX, y: g.y });
+    }
+  }
+
+  // Build smooth bezier path
+  let pathD = '';
+  if (passPoints.length > 0) {
+    pathD = `M ${passPoints[0].x} ${passPoints[0].y}`;
+    for (let i = 1; i < passPoints.length; i++) {
+      const prev = passPoints[i - 1];
+      const curr = passPoints[i];
+      const midY = (prev.y + curr.y) / 2;
+      pathD += ` C ${prev.x} ${midY}, ${curr.x} ${midY}, ${curr.x} ${curr.y}`;
+    }
+  }
+
+  // SVG construction
+  let svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`;
+
+  // Defs
+  svg += `
+  <defs>
+    <filter id="glow-red"><feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#e63946" flood-opacity="0.5"/></filter>
+    <filter id="glow-blue"><feDropShadow dx="0" dy="0" stdDeviation="3" flood-color="#3a86ff" flood-opacity="0.5"/></filter>
+  </defs>`;
+
+  // Background
+  svg += `<rect width="${width}" height="${height}" fill="#1a1d22" rx="6"/>`;
+
+  // Center line
+  svg += `<line x1="${centerX}" y1="${topPad - 10}" x2="${centerX}" y2="${height - botPad + 10}" stroke="#2e3340" stroke-width="1" stroke-dasharray="4,4"/>`;
+
+  // Passage line
+  if (pathD) {
+    svg += `<path d="${pathD}" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>`;
+    svg += `<path d="${pathD}" fill="none" stroke="rgba(255,255,255,0.15)" stroke-width="2" stroke-dasharray="6,4" stroke-linecap="round"/>`;
+  }
+
+  // Gates
+  for (const g of positioned) {
+    const gateColor = g.color === 'red' ? '#e63946' : '#3a86ff';
+    const glowId = g.color === 'red' ? 'glow-red' : 'glow-blue';
+    const labelX = g.x > centerX ? g.x + gateR + 8 : (g.x < centerX ? g.x - gateR - 8 : g.x + gateR + 14);
+    const anchor = g.x > centerX ? 'start' : (g.x < centerX ? 'end' : 'start');
+
+    if (g.type === 'start') {
+      // Start gate — horizontal bar
+      svg += `<line x1="${centerX - 25}" y1="${g.y}" x2="${centerX + 25}" y2="${g.y}" stroke="#2ec4b6" stroke-width="3" stroke-linecap="round"/>`;
+      svg += `<circle cx="${centerX - 25}" cy="${g.y}" r="3" fill="#2ec4b6"/>`;
+      svg += `<circle cx="${centerX + 25}" cy="${g.y}" r="3" fill="#2ec4b6"/>`;
+      svg += `<text x="${centerX}" y="${g.y - 10}" text-anchor="middle" fill="#2ec4b6" font-family="'DM Mono',monospace" font-size="10" font-weight="500">START</text>`;
+
+    } else if (g.type === 'finish') {
+      svg += `<line x1="${centerX - 25}" y1="${g.y}" x2="${centerX + 25}" y2="${g.y}" stroke="#2ec4b6" stroke-width="3" stroke-linecap="round"/>`;
+      svg += `<circle cx="${centerX - 25}" cy="${g.y}" r="3" fill="#2ec4b6"/>`;
+      svg += `<circle cx="${centerX + 25}" cy="${g.y}" r="3" fill="#2ec4b6"/>`;
+      svg += `<text x="${centerX}" y="${g.y + 18}" text-anchor="middle" fill="#2ec4b6" font-family="'DM Mono',monospace" font-size="10" font-weight="500">FINISH</text>`;
+
+    } else if (g.type === 'regular') {
+      svg += `<circle cx="${g.x}" cy="${g.y}" r="${gateR}" fill="${gateColor}" filter="url(#${glowId})"/>`;
+      svg += `<text x="${labelX}" y="${g.y + 4}" text-anchor="${anchor}" fill="#8b8f9a" font-family="'DM Mono',monospace" font-size="11" font-weight="500">${g.gateNum}</text>`;
+
+    } else if (g.type === 'double') {
+      svg += `<circle cx="${g.x}" cy="${g.y}" r="${gateR}" fill="${gateColor}" filter="url(#${glowId})"/>`;
+      svg += `<circle cx="${g.x}" cy="${g.y2}" r="${gateR}" fill="${gateColor}" filter="url(#${glowId})"/>`;
+      svg += `<line x1="${g.x}" y1="${g.y + gateR}" x2="${g.x}" y2="${g.y2 - gateR}" stroke="${gateColor}" stroke-width="2" opacity="0.4"/>`;
+      svg += `<text x="${g.x + gateR + 10}" y="${(g.y + g.y2) / 2 + 4}" text-anchor="start" fill="#8b8f9a" font-family="'DM Mono',monospace" font-size="11" font-weight="500">${g.gateNum}</text>`;
+
+    } else if (g.type === 'undergate') {
+      svg += `<circle cx="${g.x}" cy="${g.y}" r="${poleR + 2}" fill="none" stroke="${gateColor}" stroke-width="2" stroke-dasharray="3,2" filter="url(#${glowId})"/>`;
+      svg += `<circle cx="${g.x}" cy="${g.y}" r="2.5" fill="${gateColor}"/>`;
+      svg += `<text x="${g.x + poleR + 12}" y="${g.y + 4}" text-anchor="start" fill="#8b8f9a" font-family="'DM Mono',monospace" font-size="11" font-weight="500">${g.gateNum}u</text>`;
+    }
+
+    // Annotations
+    if (g.annotations && g.annotations.length > 0) {
+      for (let ai = 0; ai < g.annotations.length; ai++) {
+        const annY = g.y + 4 + ai * 14;
+        const annX = width - 14;
+        svg += `<text x="${annX}" y="${annY}" text-anchor="end" fill="#f4a261" font-family="'DM Sans',sans-serif" font-size="10" font-style="italic" opacity="0.8">⛰ ${escSvg(g.annotations[ai])}</text>`;
+      }
+    }
+
+    // Flag
+    if (g.flagged) {
+      const fx = 14;
+      svg += `<text x="${fx}" y="${g.y + 4}" text-anchor="start" fill="#facc15" font-size="12">⚑</text>`;
+    }
+  }
+
+  svg += '</svg>';
+  return svg;
+}
+
+function escSvg(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── Main ──
+
+function generate() {
+  const raw = document.getElementById('transcript').value.trim();
+  const errorBox = document.getElementById('errorBox');
+  const parsedSection = document.getElementById('parsedSection');
+  const diagramSection = document.getElementById('diagramSection');
+
+  errorBox.innerHTML = '';
+  parsedSection.innerHTML = '';
+  diagramSection.innerHTML = '';
+
+  if (!raw) {
+    errorBox.innerHTML = '<div class="error-msg">Enter a transcript above — tap the mic icon on your keyboard to dictate.</div>';
+    return;
+  }
+
+  const { gates, errors } = parseTranscript(raw);
+
+  if (gates.length === 0) {
+    errorBox.innerHTML = '<div class="error-msg">No gates found. Try: start, red, blue, red, blue, finish</div>';
+    return;
+  }
+
+  // Show parsed output
+  parsedSection.innerHTML = `
+    <div class="parsed-section">
+      <label>Parsed (${gates.filter(g => g.gateNum).length} gates)</label>
+      <div class="parsed-output">${renderParsed(gates)}</div>
+    </div>`;
+
+  // Show diagram
+  const svg = generateSVG(gates);
+  diagramSection.innerHTML = `
+    <div class="diagram-section">
+      <label>Course Diagram</label>
+      <div class="diagram-container">${svg}</div>
+    </div>`;
+}
+
+// Auto-generate on Enter in textarea (but not on mobile where Enter adds newline)
+document.getElementById('transcript').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && !e.shiftKey && window.innerWidth > 768) {
+    e.preventDefault();
+    generate();
+  }
+});
+</script>
+</body>
+</html>
